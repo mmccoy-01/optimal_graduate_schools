@@ -6,4 +6,4 @@ My loose goal was to find the optimal graduate school using R. At the time, I th
 
 ## Loose Goals:
 1. I didn’t want a school that is a research mill.
-2. Yet, I still wanted a school that has an impact on research.
+2. Yet, I still wanted a school that had an impact on research.
