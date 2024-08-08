@@ -1,0 +1,148 @@
+---
+title: "Optimal Graduate Schools"
+author: "Michael McCoy"
+date: "11/3/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Markowitz's Efficient Frontier of Optimal ~~Portfolios and Allocation~~ **Graduate Schools**
+#### My loose goal is to find the optimal graduate school using R. I thought this would be good practice for an R beginner like me
+
+## Loose Goals: 
+1. I don't want a school that is a research mill.
+2. Yet, I still want a school that has an impact on research.
+
+There is a delicate trade-off between citations and impact. Here, impact is defined as how many citations a university receives divided by how many total papers each university publishes. The following data on impact and citations is across a five-year span from 2012 through the end of 2016.
+
+The data on total papers reflect journals indexed in the following Web of Science Core Collection editions: Science Citation Index Expanded, Social Sciences Citation Index, and Arts and Humanities Citation Index. Data included herein are derived from Clarivate Analytics InCites. For blank categories, those institutions may have received less than 600 citations over the five-year span from 2012 through the end of 2016.
+
+To begin, let's load our necessary packages and load my starting data set of universities that I created in Excel
+```{r}
+library(tidyverse)
+library(readxl)
+Graduate_Programs_Copy <- read_excel("data/raw_data/Graduate Programs - Copy.xlsx")
+```
+Here is a brief summary of the data:
+```{r}
+summary(Graduate_Programs_Copy)
+```
+Now I am going to print the names of all the universities in the data set (printing all the other columns won't fit)
+```{r}
+Graduate_Programs_Copy %>% 
+  select(Institution) %>% 
+  print(n=Inf)
+```
+Wow, that's 160 universities. Let's have some standards. We'll first filter by 'Bolder' Boulder Model programs which are schools that have high research-related accreditation and membership standards. Then, we'll print the scatter plot of the 'Bolder' Boulder institutions: X = Impact, Y = Citations.
+As a reminder, Impact = Citations/Web of Science Documents). As another reminder, all citations and web of science documents are across a 5 year period from 2012 to the end of 2016.
+```{r}
+Bolder_Boulder <- Graduate_Programs_Copy %>%
+  filter(!is.na(Bolder_Boulder_Model))
+ggplot(Bolder_Boulder, aes(Impact, Citations)) +
+  geom_point()
+```
+
+Based on this 'Bolder' Boulder criteria, we go from 160 institutions to 43. Since the data looks like a polynomial function, let's apply a quadratic regression curve of best fit to the scatter plot.
+```{r}
+Bolder_Boulder %>% 
+  ggplot(aes(Impact, Citations)) +
+  geom_point() +
+  #plot line of best fit using quadratic regression
+  geom_smooth(method = "lm", formula = y ~ x + I(x^2))
+```
+
+If we were to plot a tangent line, (unfortunately my R knowledge is limited) it would be around x= 6. This tangent line would represent the optimal number of citations and impact. However, now the data doesn't look like a polynomial function. It looks more like a linear function which would completely alter my goal of optimization. Let's plot a regression line of best fit and see how it looks.
+```{r}
+Bolder_Boulder %>% 
+  ggplot(aes(Impact, Citations)) +
+  geom_point() +
+  #plot line of best fit using regression
+  geom_smooth(method = "lm")
+```
+
+Hmmmm. Let's see the significance of these regression lines.
+```{r}
+cor.test(Bolder_Boulder$Impact, Bolder_Boulder$Citations)
+```
+
+Okay, well, yes it makes sense that they're correlated because impact is directly derived from citations. Although, now I'm interested in seeing Articles by Citations of our 'Bolder' Boulder model universities. Then seeing if that is correlated. In other words, if you have more article publications, are you going to have more people citing those publications? You would certainly hope so as a university, otherwise you're operating on diminishing returns. Enough chatter, let's see the data.
+```{r}
+Bolder_Boulder %>% 
+  ggplot(aes(Citations, Articles)) +
+  geom_point() +
+  #plot line of best fit using regression
+  geom_smooth(method = "lm")
+```
+```{r}
+cor.test(Bolder_Boulder$Articles, Bolder_Boulder$Citations)
+```
+
+Hmmm. Interesting. Those are some pretty compelling results. Articles and citations are strongly correlated at p-value < 2.2e-16.
+
+Nevertheless I digress. Let's go back to our optimal universities plot from before.
+```{r}
+Bolder_Boulder %>% 
+  ggplot(aes(Impact, Citations)) +
+  geom_point() +
+  #plot line of best fit using quadratic regression
+  geom_smooth(method = "lm", formula = y ~ x + I(x^2))
+```
+
+Since there are 9 schools that cluster near x = 6. Let's see the names of those schools. I will print out the schools between 5.7 and 6.5. There should be 9.
+```{r}
+filter(Bolder_Boulder, between(Impact, 5.8, 6.5)) %>% 
+  select(Institution)
+```
+
+I was surprised that local universities, Temple and UPenn, were not one of the 9 universities. After checking the impact number for Temple and Upenn, it was 5.31 and 6.84, respectively. Since the general rule is to apply to 10-12 schools, I decided to expand my impact range to 5.3 to 7. Although, during my grad school search process, I will make reasonable exceptions for other local schools, since I would like to stay local if possible. 
+```{r}
+filter(Bolder_Boulder, between(Impact, 5.3, 7)) %>% 
+  select(Institution)
+```
+Now we have 26 options. Okay cool, but Harvard is one of them. Not that it's a bad thing, but Harvard is an outlier with over 40,000 citations and only an impact of
+about 6.7. Let's exclude Harvard.
+```{r}
+filter(Bolder_Boulder, between(Impact, 5.3, 7), Citations < 30000) %>% 
+  select(Institution)
+```
+Nice, now we are at 25 universities.
+
+Let's store these universities in a new data frame with the relevant info.
+```{r}
+optimal_uni <- filter(Bolder_Boulder, between(Impact, 5.3, 7),
+                      Citations < 30000) %>% 
+  select(Institution, Citations, Articles, Impact, Valence)
+```
+Let's print out the data frame that has our optimal universities.
+```{r}
+optimal_uni %>% print(n=25)
+```
+Now, let's pause for a moment. You might notice that I added a column called valence. Valence refers to U.S. News and World Report's Ranking survey of academics at peer institutions. Each variable reflects average rating from 1 (marginal) to 5 (outstanding) in clinical psychology graduate programs. Again, I'm interested in psych research, not so much clinical psych, but it could still be a good measurement of overall. All of the universities except Michigan State and Georgia are less than 4. So valence isn't going to be a useful measure after all.
+
+As it stands, this data frame is sorted in descending order by impact which is what I want. However, you'll notice that there is a large degree of variance by citations (up to 10,000). That's fine, at this point, I'll individually browse each university's program and start excluding based on personal criteria. The average number of citations for our 25 optimum graduate schools across a 5 year span is:
+```{r}
+mean(optimal_uni$Citations)
+```
+
+The average number of articles published for our 25 optimum graduate schools across a 5 year span is:
+```{r}
+mean(optimal_uni$Articles)
+```
+
+In sum, I went from 160 universities to 43 to 25. I did this by first choosing universities that have a Bolder Boulder model for graduate programs which is essentially a model that trains scientific rigor. Next, I plotted the 'Bolder' Boulder model universities and applied a linear regression to find the optimal research impact by total number of citations.
+
+# Limitations:
+The data is not the most up to date (off by about 5 years). This data is not limited to just psychology departments, it is looking across whole university academic departments. This isn't the most thorough way of looking at schools, but it is a good start for getting a start at which schools to look at. In the end, I think this was good practice with programming and using R while I looked at grad schools. As you'll see below, I also had some missing data from some notable R1 universities which could have impacted my total optimal schools.
+
+# Appendum:
+After rereading through the code, there were 16 schools that I excluded because they didn't have any data on citations and consequently impact. Let's see what schools didn't have that data:
+```{r}
+Graduate_Programs_Copy %>% 
+  select(Institution, Valence) %>% 
+  filter(is.na(Graduate_Programs_Copy$Citations))
+```
+I was curious if I had any valence data on these universities. Unfortunately for what valence data exists, they do not look so good. I suppose I will briefly look at some of these schools during the grad school search process in addition to the optimal schools to be inclusive.
